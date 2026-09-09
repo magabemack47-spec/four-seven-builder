@@ -1,0 +1,95 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      jobId:
+        description: 'Job ID'
+        required: true
+      appName:
+        description: 'App name'
+        required: true
+      packageName:
+        description: 'Package name'
+        required: true
+      projectType:
+        description: 'Project type'
+        required: true
+      apiBaseUrl:
+        description: 'API Base URL'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Create app directory
+        run: mkdir -p app
+
+      - name: Download project
+        run: |
+          echo "Downloading project for job: ${{ github.event.inputs.jobId }}"
+          curl -L -o project.zip \
+            -H "x-builder-secret: ${{ secrets.BUILDER_API_SECRET }}" \
+            "${{ github.event.inputs.apiBaseUrl }}/api/internal/project/${{ github.event.inputs.jobId }}"
+          unzip -o project.zip -d app/ || true
+          echo "Project downloaded successfully."
+
+      - name: Check if index.html exists
+        run: |
+          if [ -f "app/index.html" ]; then
+            echo "index.html found"
+          else
+            echo "Creating default index.html"
+            echo '<!DOCTYPE html><html><head><title>App</title></head><body><h1>App</h1></body></html>' > app/index.html
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install PWABuilder
+        run: npm install -g pwabuilder
+
+      - name: Build APK with PWABuilder
+        run: |
+          cd app
+          pwabuilder package --platform android
+
+      - name: Upload APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: app/output/*.apk
+
+      - name: Send APK to API
+        if: success()
+        run: |
+          APK_FILE=$(find app/output -name "*.apk" | head -n 1)
+          if [ -f "$APK_FILE" ]; then
+            echo "APK found: $APK_FILE"
+            curl -X POST \
+              -H "x-builder-secret: ${{ secrets.BUILDER_API_SECRET }}" \
+              -F "apk=@$APK_FILE" \
+              "${{ github.event.inputs.apiBaseUrl }}/api/internal/complete/${{ github.event.inputs.jobId }}"
+          else
+            echo "No APK file found."
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -H "x-builder-secret: ${{ secrets.BUILDER_API_SECRET }}" \
+              -d '{"message":"APK file not found.","error":"Build failed to produce APK."}' \
+              "${{ github.event.inputs.apiBaseUrl }}/api/internal/fail/${{ github.event.inputs.jobId }}"
+          fi
+
+      - name: Report failure
+        if: failure()
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-builder-secret: ${{ secrets.BUILDER_API_SECRET }}" \
+            -d '{"message":"GitHub Actions workflow failed.","error":"Workflow execution error."}' \
+            "${{ github.event.inputs.apiBaseUrl }}/api/internal/fail/${{ github.event.inputs.jobId }}"

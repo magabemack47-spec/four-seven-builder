@@ -1,95 +1,87 @@
-name: Build APK
+name: Build APK - ${{ github.event.client_payload.jobId }}
 
 on:
-  workflow_dispatch:
-    inputs:
-      jobId:
-        description: 'Job ID'
-        required: true
-      appName:
-        description: 'App name'
-        required: true
-      packageName:
-        description: 'Package name'
-        required: true
-      projectType:
-        description: 'Project type'
-        required: true
-      apiBaseUrl:
-        description: 'API Base URL'
-        required: true
+  repository_dispatch:
+    types: [build-apk]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    name: ${{ github.event.client_payload.jobId }}
 
     steps:
-      - name: Create app directory
-        run: mkdir -p app
-
-      - name: Download project
-        run: |
-          echo "Downloading project for job: ${{ github.event.inputs.jobId }}"
-          curl -L -o project.zip \
-            -H "x-builder-secret: ${{ secrets.BUILDER_API_SECRET }}" \
-            "${{ github.event.inputs.apiBaseUrl }}/api/internal/project/${{ github.event.inputs.jobId }}"
-          unzip -o project.zip -d app/ || true
-          echo "Project downloaded successfully."
-
-      - name: Check if index.html exists
-        run: |
-          if [ -f "app/index.html" ]; then
-            echo "index.html found"
-          else
-            echo "Creating default index.html"
-            echo '<!DOCTYPE html><html><head><title>App</title></head><body><h1>App</h1></body></html>' > app/index.html
-          fi
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Install PWABuilder
-        run: npm install -g pwabuilder
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Build APK with PWABuilder
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Cordova
+        run: npm install -g cordova
+
+      - name: Decode project file
+        env:
+          PROJECT_BASE64: ${{ github.event.client_payload.projectBase64 }}
+          PROJECT_NAME: ${{ github.event.client_payload.projectFileName }}
+        run: |
+          echo "$PROJECT_BASE64" | base64 -d > "$PROJECT_NAME"
+          ls -la
+
+      - name: Create Cordova project
+        env:
+          APP_NAME: ${{ github.event.client_payload.appName }}
+          PACKAGE_NAME: ${{ github.event.client_payload.packageName }}
+        run: |
+          cordova create app $PACKAGE_NAME "$APP_NAME"
+
+      - name: Prepare project files
+        env:
+          PROJECT_NAME: ${{ github.event.client_payload.projectFileName }}
+        run: |
+          cd app/www
+          rm -f css/index.css js/index.js index.html
+          if [[ "$PROJECT_NAME" == *.zip ]]; then
+            unzip -o "../../$PROJECT_NAME" -d .
+          else
+            cp "../../$PROJECT_NAME" index.html
+          fi
+          ls -la
+
+      - name: Add Android platform
         run: |
           cd app
-          pwabuilder package --platform android
+          cordova platform add android
 
-      - name: Upload APK
-        if: always()
+      - name: Build APK
+        run: |
+          cd app
+          cordova build android --release -- --packageType=apk
+
+      - name: Find and rename APK
+        env:
+          APP_NAME: ${{ github.event.client_payload.appName }}
+        run: |
+          find app -name "*.apk" -type f
+          APK=$(find app -name "*.apk" -type f | head -1)
+          if [ -z "$APK" ]; then echo "No APK found!"; exit 1; fi
+          mkdir -p output
+          cp "$APK" "output/${APP_NAME}.apk"
+          ls -la output/
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: app/output/*.apk
-
-      - name: Send APK to API
-        if: success()
-        run: |
-          APK_FILE=$(find app/output -name "*.apk" | head -n 1)
-          if [ -f "$APK_FILE" ]; then
-            echo "APK found: $APK_FILE"
-            curl -X POST \
-              -H "x-builder-secret: ${{ secrets.BUILDER_API_SECRET }}" \
-              -F "apk=@$APK_FILE" \
-              "${{ github.event.inputs.apiBaseUrl }}/api/internal/complete/${{ github.event.inputs.jobId }}"
-          else
-            echo "No APK file found."
-            curl -X POST \
-              -H "Content-Type: application/json" \
-              -H "x-builder-secret: ${{ secrets.BUILDER_API_SECRET }}" \
-              -d '{"message":"APK file not found.","error":"Build failed to produce APK."}' \
-              "${{ github.event.inputs.apiBaseUrl }}/api/internal/fail/${{ github.event.inputs.jobId }}"
-          fi
-
-      - name: Report failure
-        if: failure()
-        run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -H "x-builder-secret: ${{ secrets.BUILDER_API_SECRET }}" \
-            -d '{"message":"GitHub Actions workflow failed.","error":"Workflow execution error."}' \
-            "${{ github.event.inputs.apiBaseUrl }}/api/internal/fail/${{ github.event.inputs.jobId }}"
+          name: ${{ github.event.client_payload.jobId }}
+          path: output/*.apk
+          retention-days: 7

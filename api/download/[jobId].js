@@ -1,53 +1,70 @@
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    const { jobId } = req.query;
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    if (req.method === 'OPTIONS') return res.status(200).end();
+
+    const jobId = req.query && req.query.jobId;
     const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
     const GITHUB_OWNER = process.env.GITHUB_OWNER;
     const GITHUB_REPO = process.env.GITHUB_REPO;
 
+    if (!jobId) return res.status(400).json({ error: 'Job ID required' });
+    if (!GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO) {
+        return res.status(500).json({ error: 'GitHub is not configured on the server.' });
+    }
+
     try {
-        const runsUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=30`;
-        const runsResponse = await fetch(runsUrl, {
-            headers: {
-                'Authorization': `token ${GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'four-seven-builder'
-            }
-        });
+        const runsResponse = await fetch(
+            `https://api.github.com/repos/\( {GITHUB_OWNER}/ \){GITHUB_REPO}/actions/runs?per_page=50&event=repository_dispatch`,
+            { headers: githubHeaders(GITHUB_TOKEN) }
+        );
         const runsData = await runsResponse.json();
-        const run = runsData.workflow_runs.find(r => (r.name && r.name.includes(jobId)) || (r.display_title && r.display_title.includes(jobId)));
+        const run = (runsData.workflow_runs || []).find((r) => {
+            const hay = [r.name, r.display_title].filter(Boolean).join(' ');
+            return hay.includes(jobId);
+        });
 
         if (!run) return res.status(404).json({ error: 'Build not found' });
 
-        const artifactsUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${run.id}/artifacts`;
-        const artResponse = await fetch(artifactsUrl, {
-            headers: {
-                'Authorization': `token ${GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'four-seven-builder'
-            }
-        });
+        const artResponse = await fetch(
+            `https://api.github.com/repos/\( {GITHUB_OWNER}/ \){GITHUB_REPO}/actions/runs/${run.id}/artifacts`,
+            { headers: githubHeaders(GITHUB_TOKEN) }
+        );
         const artData = await artResponse.json();
+        const artifacts = artData.artifacts || [];
+        const artifact = artifacts.find((a) => a.name.includes(jobId)) || artifacts[0];
 
-        if (!artData.artifacts || artData.artifacts.length === 0) {
-            return res.status(404).json({ error: 'No artifacts found yet' });
-        }
+        if (!artifact) return res.status(404).json({ error: 'No APK artifact found yet.' });
 
-        const artifact = artData.artifacts[0];
         const downloadResponse = await fetch(artifact.archive_download_url, {
-            headers: {
-                'Authorization': `token ${GITHUB_TOKEN}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'four-seven-builder'
-            },
+            headers: githubHeaders(GITHUB_TOKEN),
             redirect: 'manual'
         });
 
         const location = downloadResponse.headers.get('location');
-        if (location) res.redirect(302, location);
-        else res.status(500).json({ error: 'Could not get download URL' });
+        if (location) {
+            res.setHeader('Cache-Control', 'no-store');
+            return res.redirect(302, location);
+        }
 
+        if (!downloadResponse.ok) {
+            return res.status(500).json({ error: 'GitHub did not return a download URL.' });
+        }
+
+        const buf = Buffer.from(await downloadResponse.arrayBuffer());
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', 'attachment; filename="' + jobId + '.zip"');
+        return res.status(200).send(buf);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message });
     }
+}
+
+function githubHeaders(token) {
+    return {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'four-seven-builder',
+        'X-GitHub-Api-Version': '2022-11-28'
+    };
 }

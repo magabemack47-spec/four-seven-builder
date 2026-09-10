@@ -1,11 +1,11 @@
 {
-  "name": "four-seven-builder-api",
-  "version": "2.0.0",
-  "description": "FOUR x SEVEN App & Game Builder - API Backend",
-  "main": "server.js",
+  "name": "four-seven-builder",
+  "version": "2.1.0",
+  "description": "FOUR x SEVEN App & Game Builder",
+  "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.js",
+    "start:local": "node server.js",
     "dev": "node server.js"
   },
   "author": "SELLO",

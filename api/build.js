@@ -109,7 +109,7 @@ export default async function handler(req, res) {
 
 function githubHeaders(token) {
     return {
-        Authorization: `Bearer ${token}`,
+        Authorization: 'token ' + token,
         Accept: 'application/vnd.github+json',
         'Content-Type': 'application/json',
         'User-Agent': 'four-seven-builder',

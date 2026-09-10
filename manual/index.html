@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Star Tap</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body {
+      margin: 0;
+      height: 100vh;
+      background: #05080d;
+      color: #d7ffe4;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    #ui {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+      z-index: 2;
+    }
+    #board {
+      position: fixed;
+      inset: 0;
+    }
+    #start {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,.72);
+      z-index: 3;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 { color: #00ff41; margin: 0 0 10px; }
+    p { color: #9bb7a8; }
+    button {
+      margin-top: 18px;
+      border: 0;
+      border-radius: 10px;
+      background: #00ff41;
+      color: #000;
+      font-size: 20px;
+      font-weight: bold;
+      padding: 12px 28px;
+    }
+    .star {
+      position: absolute;
+      border-radius: 50%;
+      background: #00ff41;
+      box-shadow: 0 0 18px #00ff41;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <span>Score: <span id="score">0</span></span>
+    <span>Time: <span id="time">20</span></span>
+  </div>
+  <div id="board"></div>
+  <div id="start">
+    <h1>STAR TAP</h1>
+    <p>Tap the green stars before they vanish.</p>
+    <button onclick="startGame()">PLAY</button>
+  </div>
+
+  <script>
+    const board = document.getElementById('board');
+    const startBox = document.getElementById('start');
+    const scoreEl = document.getElementById('score');
+    const timeEl = document.getElementById('time');
+    let score = 0;
+    let time = 20;
+    let timer = null;
+    let spawn = null;
+
+    function startGame() {
+      score = 0;
+      time = 20;
+      scoreEl.textContent = score;
+      timeEl.textContent = time;
+      board.innerHTML = '';
+      startBox.style.display = 'none';
+      spawnStar();
+      spawn = setInterval(spawnStar, 700);
+      timer = setInterval(function() {
+        time -= 1;
+        timeEl.textContent = time;
+        if (time <= 0) endGame();
+      }, 1000);
+    }
+
+    function spawnStar() {
+      const star = document.createElement('div');
+      star.className = 'star';
+      const size = 36 + Math.floor(Math.random() * 28);
+      star.style.width = size + 'px';
+      star.style.height = size + 'px';
+      star.style.left = Math.random() * (window.innerWidth - size) + 'px';
+      star.style.top = (60 + Math.random() * (window.innerHeight - size - 80)) + 'px';
+      star.onclick = function() {
+        score += 1;
+        scoreEl.textContent = score;
+        star.remove();
+      };
+      board.appendChild(star);
+      setTimeout(function() {
+        if (star.parentNode) star.remove();
+      }, 1200);
+    }
+
+    function endGame() {
+      clearInterval(timer);
+      clearInterval(spawn);
+      board.innerHTML = '';
+      startBox.style.display = 'flex';
+      startBox.querySelector('p').textContent = 'Game over. Score: ' + score;
+      startBox.querySelector('button').textContent = 'PLAY AGAIN';
+    }
+  </script>
+</body>
+</html>

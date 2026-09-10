@@ -1,56 +1,216 @@
-# FOUR x SEVEN — App & Game Builder
+<div align="center">
+
+# ⟦ FOUR × SEVEN ⟧
+
+## Universal App & Game Builder
+
+<img src="assets/four-seven-readme-animation.gif" width="100%">
+
+### Build. Create. Play. Your Way.
 
 Turn HTML websites and HTML games into Android APK files.
 
-Live site: https://four-seven-builder.vercel.app
+[Open FOUR × SEVEN](https://four-seven-builder.vercel.app)
 
-Created by **SELLO**
+</div>
 
-## What it does
+---
 
-- Write HTML, CSS, and JavaScript in the browser
-- Upload an HTML file or a ZIP project
-- Preview the project live
-- Save and load projects in the browser
-- Build a debug Android APK with GitHub Actions
-- Download the APK ZIP and install it on a phone
+## What is FOUR × SEVEN?
 
-## How to use
+FOUR × SEVEN is a web-based app and game builder designed to make turning HTML projects into Android applications easier.
 
-1. Open the live site
-2. Write your HTML or upload an HTML/ZIP file
-3. Give the project a name
-4. Click **BUILD APK**
-5. Wait for GitHub Actions to finish
-6. Download the ZIP
-7. Open the ZIP and install the `.apk` inside
+You can create a project directly in the browser or upload an existing HTML or ZIP project.
 
-On Android you must allow installs from that app/browser.
+### Features
 
-## Limits
+- Write HTML, CSS and JavaScript
+- Upload HTML projects
+- Upload ZIP projects
+- Preview projects
+- Save projects
+- Load projects
+- Automatically build Android APK files
+- Track the build progress
+- Download the finished APK
+- Install the APK on Android
 
-- Maximum upload size: **3.5 MB**
-- A build usually takes **3 to 8 minutes**
-- The APK is a **debug** build, not a Play Store release
-- HTML/ZIP files are stored briefly in the `jobs/` folder during a build
+---
 
-## Project files
+## How It Works
 
-- `index.html` — builder website
-- `api/` — Vercel API for health, build, status, and download
-- `.github/workflows/build-apk.yml` — Cordova Android build
-- `jobs/` — temporary upload folder
+```text
+UPLOAD PROJECT
+      |
+      v
+FOUR × SEVEN
+      |
+      v
+AUTOMATIC BUILD
+      |
+      v
+GITHUB ACTIONS
+      |
+      v
+ANDROID APK
+      |
+      v
+DOWNLOAD
+      |
+      v
+INSTALL
+```
 
-## Setup
+---
 
-The live site needs these Vercel environment variables:
+## Build Your App
 
-- `GITHUB_TOKEN`
-- `GITHUB_OWNER`
-- `GITHUB_REPO`
+### Step 1 — Create or Upload
 
-After changing files or env vars, redeploy on Vercel.
+Write your HTML project in the editor or upload an existing:
 
-## License
+```text
+.html
+.zip
+```
 
-MIT License. See `LICENSE`.
+### Step 2 — Start the Build
+
+Press the build button and FOUR × SEVEN sends your project to the Android build system.
+
+### Step 3 — Wait for the Build
+
+The build system prepares your project and creates an Android APK.
+
+### Step 4 — Download
+
+When the build is finished, download your APK directly from the builder.
+
+---
+
+## Supported Projects
+
+FOUR × SEVEN is designed for projects containing:
+
+```text
+HTML
+CSS
+JavaScript
+Images
+Fonts
+Other web assets
+```
+
+ZIP projects should contain the files needed by the website or game.
+
+---
+
+## Technology
+
+```text
+Frontend
+HTML
+CSS
+JavaScript
+
+Backend
+Node.js
+Express
+
+Build System
+GitHub Actions
+Android
+Cordova
+
+Hosting
+Vercel
+```
+
+---
+
+## Project Flow
+
+```text
+HTML / ZIP
+    |
+    v
+FOUR × SEVEN
+    |
+    v
+Builder API
+    |
+    v
+GitHub Actions
+    |
+    v
+Android Build
+    |
+    v
+APK
+    |
+    v
+FOUR × SEVEN
+    |
+    v
+DOWNLOAD APK
+```
+
+---
+
+## Vision
+
+FOUR × SEVEN is built around a simple idea:
+
+> Create your project.
+> Build your app.
+> Get your APK.
+
+No complicated Android development environment is required for the basic web-builder workflow.
+
+---
+
+## Live Website
+
+<div align="center">
+
+### FOUR × SEVEN
+
+[Open the Builder](https://four-seven-builder.vercel.app)
+
+</div>
+
+---
+
+## Created By
+
+<div align="center">
+
+### SELLO
+
+**FOUR × SEVEN**
+
+Universal App & Game Builder
+
+</div>
+
+---
+
+## Status
+
+```text
+Project       FOUR × SEVEN
+Builder       Online
+APK Builder   Enabled
+Platform      Web + Android
+Build System  GitHub Actions
+```
+
+---
+
+<div align="center">
+
+## FOUR × SEVEN
+
+### Dream. Build. Play.
+
+</div>

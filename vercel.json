@@ -1,3 +1,12 @@
 {
-  "version": 2
+  "version": 2,
+  "framework": null,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "functions": {
+    "api/health.js": { "maxDuration": 10 },
+    "api/build.js": { "maxDuration": 10 },
+    "api/build/[jobId].js": { "maxDuration": 10 },
+    "api/download/[jobId].js": { "maxDuration": 10 }
+  }
 }

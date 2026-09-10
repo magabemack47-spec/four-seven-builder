@@ -7,15 +7,15 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+    const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+    const GITHUB_OWNER = process.env.GITHUB_OWNER;
+    const GITHUB_REPO = process.env.GITHUB_REPO;
+
+    if (!GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO) {
+        return res.status(500).json({ error: 'GitHub not configured on server.' });
+    }
+
     try {
-        const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-        const GITHUB_OWNER = process.env.GITHUB_OWNER;
-        const GITHUB_REPO = process.env.GITHUB_REPO;
-
-        if (!GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO) {
-            return res.status(500).json({ error: 'GitHub not configured. Add GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO to Vercel env vars.' });
-        }
-
         const chunks = [];
         for await (const chunk of req) chunks.push(chunk);
         const body = Buffer.concat(chunks);
@@ -56,17 +56,9 @@ export default async function handler(req, res) {
             throw new Error('GitHub trigger failed: ' + err);
         }
 
-        return res.status(200).json({
-            success: true,
-            jobId,
-            status: 'queued',
-            message: 'Build started on GitHub Actions',
-            statusUrl: `/api/build/${jobId}`,
-            downloadUrl: `/api/download/${jobId}`
-        });
+        return res.status(200).json({ success: true, jobId, status: 'queued' });
 
     } catch (error) {
-        console.error('Build error:', error);
         return res.status(500).json({ error: error.message });
     }
 }

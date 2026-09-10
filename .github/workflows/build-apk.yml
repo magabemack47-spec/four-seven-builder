@@ -1,58 +1,126 @@
 name: Build APK
 
+run-name: Build ${{ github.event.client_payload.jobId }}
+
 on:
   repository_dispatch:
     types: [build-apk]
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      JOB_ID: ${{ github.event.client_payload.jobId }}
+      APP_NAME: ${{ github.event.client_payload.appName }}
+      PACKAGE_NAME: ${{ github.event.client_payload.packageName }}
+      PROJECT_FILE: ${{ github.event.client_payload.projectFileName }}
+      PROJECT_PATH: ${{ github.event.client_payload.projectPath }}
+      COMMIT_SHA: ${{ github.event.client_payload.commitSha }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout project commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.client_payload.commitSha || github.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - uses: actions/setup-java@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - run: npm install -g cordova
-      - name: Decode project
-        env:
-          PROJECT_BASE64: ${{ github.event.client_payload.projectBase64 }}
-          PROJECT_NAME: ${{ github.event.client_payload.projectFileName }}
-        run: echo "$PROJECT_BASE64" | base64 -d > "$PROJECT_NAME"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Cordova
+        run: npm install -g cordova
+
+      - name: Verify uploaded project
+        run: |
+          echo "Job: $JOB_ID"
+          echo "App: $APP_NAME"
+          echo "Package: $PACKAGE_NAME"
+          echo "File: $PROJECT_FILE"
+          echo "Path: $PROJECT_PATH"
+          test -n "$JOB_ID"
+          test -n "$PROJECT_PATH"
+          test -f "$PROJECT_PATH"
+
       - name: Create Cordova project
-        env:
-          APP_NAME: ${{ github.event.client_payload.appName }}
-          PACKAGE_NAME: ${{ github.event.client_payload.packageName }}
-        run: cordova create app $PACKAGE_NAME "$APP_NAME"
-      - name: Add project files
-        env:
-          PROJECT_NAME: ${{ github.event.client_payload.projectFileName }}
+        run: |
+          PKG="$PACKAGE_NAME"
+          if ! echo "\( PKG" | grep -Eq '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+ \)'; then
+            PKG="com.fourseven.app"
+          fi
+          cordova create app "$PKG" "$APP_NAME"
+
+      - name: Copy project into Cordova www
         run: |
           cd app/www
-          rm -f css/index.css js/index.js index.html
-          if [ "${PROJECT_NAME##*.}" = "zip" ]; then
-            unzip -o "../../$PROJECT_NAME" -d .
-          else
-            cp "../../$PROJECT_NAME" index.html
-          fi
-      - name: Build APK
+          rm -rf css js img
+          rm -f index.html
+          SRC="../../$PROJECT_PATH"
+          case "$PROJECT_FILE" in
+            *.zip|*.ZIP)
+              unzip -o "$SRC" -d .
+              if [ ! -f index.html ]; then
+                FOUND=$(find . -name index.html -type f | head -1)
+                if [ -n "$FOUND" ]; then
+                  DIR=$(dirname "$FOUND")
+                  shopt -s dotglob
+                  mv "$DIR"/* . 2>/dev/null || true
+                  shopt -u dotglob
+                fi
+              fi
+              ;;
+            *)
+              cp "$SRC" index.html
+              ;;
+          esac
+          test -f index.html
+
+      - name: Add Android platform and build debug APK
         run: |
           cd app
           cordova platform add android
-          cordova build android --release -- --packageType=apk
-      - name: Rename APK
-        env:
-          APP_NAME: ${{ github.event.client_payload.appName }}
+          cordova build android
+
+      - name: Collect APK
         run: |
-          APK=$(find app -name "*.apk" | head -1)
           mkdir -p output
-          cp "$APK" "output/${APP_NAME}.apk"
-      - uses: actions/upload-artifact@v4
+          APK=$(find app/platforms/android -name "*.apk" | head -1)
+          test -n "$APK"
+          SAFE_NAME=\( (echo " \){APP_NAME:-MyApp}" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
+          [ -z "$SAFE_NAME" ] && SAFE_NAME=MyApp
+          cp "\( APK" "output/ \){SAFE_NAME}.apk"
+          ls -lh output
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.client_payload.jobId }}
           path: output/*.apk
           retention-days: 7
+          if-no-files-found: error
+
+      - name: Cleanup uploaded job files
+        if: always()
+        run: |
+          git config user.name "four-seven-builder"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -d "jobs/$JOB_ID" ]; then
+            git rm -rf "jobs/$JOB_ID"
+            git commit -m "chore: cleanup $JOB_ID" || exit 0
+            git pull --rebase origin main || true
+            git push origin HEAD:main || true
+          fi

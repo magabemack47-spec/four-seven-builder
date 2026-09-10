@@ -1,0 +1,60 @@
+name: Build APK
+
+on:
+  repository_dispatch:
+    types: [build-apk]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Cordova
+        run: npm install -g cordova
+      - name: Decode project
+        env:
+          PROJECT_BASE64: ${{ github.event.client_payload.projectBase64 }}
+          PROJECT_NAME: ${{ github.event.client_payload.projectFileName }}
+        run: |
+          echo "$PROJECT_BASE64" | base64 -d > "$PROJECT_NAME"
+      - name: Create Cordova project
+        env:
+          APP_NAME: ${{ github.event.client_payload.appName }}
+          PACKAGE_NAME: ${{ github.event.client_payload.packageName }}
+        run: cordova create app $PACKAGE_NAME "$APP_NAME"
+      - name: Add project files
+        env:
+          PROJECT_NAME: ${{ github.event.client_payload.projectFileName }}
+        run: |
+          cd app/www
+          rm -f css/index.css js/index.js index.html
+          if [[ "$PROJECT_NAME" == *.zip ]]; then
+            unzip -o "../../$PROJECT_NAME" -d .
+          else
+            cp "../../$PROJECT_NAME" index.html
+          fi
+      - name: Build APK
+        run: |
+          cd app
+          cordova platform add android
+          cordova build android --release -- --packageType=apk
+      - name: Rename APK
+        env:
+          APP_NAME: ${{ github.event.client_payload.appName }}
+        run: |
+          APK=$(find app -name "*.apk" | head -1)
+          mkdir -p output
+          cp "$APK" "output/${APP_NAME}.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.client_payload.jobId }}
+          path: output/*.apk
+          retention-days: 7

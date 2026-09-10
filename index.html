@@ -54,16 +54,15 @@
         <h3>◆ SYSTEM INSTRUCTIONS</h3>
         <ol>
             <li><strong>WRITE</strong> - Write HTML/CSS/JavaScript in the editor</li>
-            <li><strong>UPLOAD</strong> - Upload an existing HTML or ZIP project</li>
+            <li><strong>UPLOAD</strong> - Upload an existing HTML or ZIP project (max 3.5 MB)</li>
             <li><strong>PREVIEW</strong> - See your project live</li>
             <li><strong>SAVE</strong> - Save your project locally</li>
             <li><strong>BUILD</strong> - Click BUILD APK</li>
-            <li><strong>DOWNLOAD</strong> - Download the completed APK</li>
+            <li><strong>DOWNLOAD</strong> - Download the ZIP and install the APK inside</li>
         </ol>
     </section>
 
     <div class="builder-layout">
-        <!-- EDITOR PANEL -->
         <div class="panel">
             <div class="panel-title">
                 <span>◆ CODE EDITOR</span>
@@ -74,7 +73,7 @@
                 <input type="file" id="projectFile" accept=".html,.htm,.zip">
                 <span class="icon">[ + ]</span>
                 <strong>Upload HTML or ZIP</strong>
-                <p>Drag & drop or click to select</p>
+                <p>Drag & drop or click to select (max 3.5 MB)</p>
                 <span id="fileName">No file selected</span>
             </div>
             <div class="file-info" id="fileInfo">
@@ -110,7 +109,6 @@
             </button>
         </div>
 
-        <!-- PREVIEW PANEL -->
         <div class="panel" style="display:flex;flex-direction:column">
             <div class="panel-title">
                 <span>◆ LIVE PREVIEW</span>
@@ -138,7 +136,7 @@
                 <div id="buildLog" class="build-log"></div>
             </div>
 
-            <a id="downloadBtn" class="download-btn hidden" href="#" target="_blank">[ DOWNLOAD APK ]</a>
+            <a id="downloadBtn" class="download-btn hidden" href="#" target="_blank">[ DOWNLOAD APK ZIP ]</a>
 
             <div id="errorBox" class="error-box hidden"></div>
             <div id="successBox" class="success-box hidden"></div>
@@ -146,24 +144,15 @@
     </div>
 
     <div class="footer-bar">
-        <span>FOUR x SEVEN BUILDER v2.0</span>
+        <span>FOUR x SEVEN BUILDER v2.1</span>
         <span>Created by <span class="creator-name">SELLO</span></span>
         <span>◆ POWERED BY GITHUB ACTIONS ◆</span>
     </div>
 
     <script>
-        // ============================================================
-        // FOUR x SEVEN - App & Game Builder
-        // ============================================================
-        
-        // ============================================================
-        // CONFIGURATION
-        // ============================================================
         const API_URL = '/api';
-        
-        // ============================================================
-        // DOM REFERENCES
-        // ============================================================
+        const MAX_UPLOAD_BYTES = 3.5 * 1024 * 1024;
+
         const codeEditor = document.getElementById('codeEditor');
         const previewFrame = document.getElementById('previewFrame');
         const projectNameInput = document.getElementById('projectName');
@@ -184,20 +173,14 @@
         const fileInfo = document.getElementById('fileInfo');
         const fileDetails = document.getElementById('fileDetails');
         const typeBtns = document.querySelectorAll('.type-btn');
-        
-        // ============================================================
-        // STATE
-        // ============================================================
+
         let jobId = null;
         let pollInterval = null;
         let isBuilding = false;
         let autoPreviewTimer = null;
         let selectedFile = null;
         let selectedType = 'app';
-        
-        // ============================================================
-        // PREVIEW FUNCTIONS
-        // ============================================================
+
         function updatePreview() {
             const html = codeEditor.value || '<h1 style="color:#333;font-family:sans-serif;text-align:center;margin-top:40%">Write your code in the editor</h1>';
             const blob = new Blob([html], { type: 'text/html' });
@@ -205,7 +188,7 @@
             previewFrame.src = url;
             setTimeout(() => URL.revokeObjectURL(url), 3000);
         }
-        
+
         function openFullscreen() {
             const html = codeEditor.value || '<h1>No code to preview</h1>';
             const win = window.open('', '_blank');
@@ -216,18 +199,12 @@
             win.document.write(html);
             win.document.close();
         }
-        
-        // ============================================================
-        // AUTO PREVIEW
-        // ============================================================
+
         codeEditor.addEventListener('input', function() {
             clearTimeout(autoPreviewTimer);
             autoPreviewTimer = setTimeout(updatePreview, 500);
         });
-        
-        // ============================================================
-        // PROJECT TYPE
-        // ============================================================
+
         typeBtns.forEach(btn => {
             btn.addEventListener('click', function() {
                 typeBtns.forEach(b => b.classList.remove('active'));
@@ -235,19 +212,21 @@
                 selectedType = this.dataset.type;
             });
         });
-        
-        // ============================================================
-        // FILE UPLOAD
-        // ============================================================
+
         function handleProjectFile(file) {
             if (!file) return;
-            
+
             const name = file.name.toLowerCase();
-            if (!['.html','.htm','.zip'].some(ext => name.endsWith(ext))) {
+            if (!['.html', '.htm', '.zip'].some(ext => name.endsWith(ext))) {
                 showError('Only HTML, HTM and ZIP files are allowed.');
                 return;
             }
-            
+
+            if (file.size > MAX_UPLOAD_BYTES) {
+                showError('File is larger than the 3.5 MB Vercel limit.');
+                return;
+            }
+
             selectedFile = file;
             const size = (file.size / 1024).toFixed(2);
             fileNameDisplay.textContent = file.name + ' (' + size + ' KB)';
@@ -255,14 +234,14 @@
             fileDetails.textContent = 'Name: ' + file.name + ' | Size: ' + size + ' KB';
             errorBox.classList.add('hidden');
             successBox.classList.add('hidden');
-            
+
             if (name.endsWith('.zip')) {
                 codeEditor.value = 'ZIP PROJECT READY\n\n' + file.name + '\n\nThe original ZIP will be uploaded directly to the builder.';
                 updatePreview();
                 showSuccess('ZIP ready: ' + file.name);
                 return;
             }
-            
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 codeEditor.value = e.target.result || '';
@@ -274,28 +253,28 @@
             };
             reader.readAsText(file);
         }
-        
+
         uploadBox.addEventListener('click', function() {
             projectFileInput.click();
         });
-        
+
         projectFileInput.addEventListener('change', function() {
             if (this.files && this.files[0]) {
                 handleProjectFile(this.files[0]);
             }
         });
-        
+
         uploadBox.addEventListener('dragover', function(e) {
             e.preventDefault();
             uploadBox.style.borderColor = '#00ff41';
             uploadBox.style.background = 'rgba(0,255,65,.05)';
         });
-        
+
         uploadBox.addEventListener('dragleave', function() {
             uploadBox.style.borderColor = 'rgba(0,255,65,.1)';
             uploadBox.style.background = 'transparent';
         });
-        
+
         uploadBox.addEventListener('drop', function(e) {
             e.preventDefault();
             uploadBox.style.borderColor = 'rgba(0,255,65,.1)';
@@ -308,10 +287,7 @@
                 handleProjectFile(file);
             }
         });
-        
-        // ============================================================
-        // PROJECT MANAGEMENT
-        // ============================================================
+
         function saveProject() {
             const name = projectNameInput.value.trim() || 'MyProject';
             try {
@@ -321,7 +297,7 @@
                 showError('Failed to save project: ' + e.message);
             }
         }
-        
+
         function loadProject() {
             const name = projectNameInput.value.trim();
             if (!name) {
@@ -342,7 +318,7 @@
                 showError('Failed to load project: ' + e.message);
             }
         }
-        
+
         function exportHTML() {
             const name = projectNameInput.value.trim() || 'MyApp';
             const code = codeEditor.value;
@@ -361,59 +337,69 @@
             setTimeout(() => URL.revokeObjectURL(url), 5000);
             showSuccess('Exported: ' + a.download);
         }
-        
+
         function clearEditor() {
             if (confirm('Clear the editor? This cannot be undone.')) {
                 selectedFile = null;
                 projectFileInput.value = '';
                 codeEditor.value = '';
+                fileNameDisplay.textContent = 'No file selected';
+                fileInfo.classList.remove('show');
                 updatePreview();
                 showSuccess('Editor cleared');
             }
         }
-        
-        // ============================================================
-        // BUILD APK - WITH FORM DATA
-        // ============================================================
+
+        function resetBuildButton() {
+            isBuilding = false;
+            buildBtn.disabled = false;
+            buildBtn.innerHTML = '> BUILD APK';
+        }
+
         async function buildAPK() {
             if (isBuilding) return;
-            
+
             errorBox.classList.add('hidden');
             successBox.classList.add('hidden');
             downloadBtn.classList.add('hidden');
-            
+
             const appName = projectNameInput.value.trim() || 'MyApp';
             const htmlCode = codeEditor.value.trim();
             const isZip = selectedFile && selectedFile.name.toLowerCase().endsWith('.zip');
-            
+
             if (!isZip && !htmlCode) {
                 showError('Please write HTML code or upload an HTML/ZIP project first.');
                 return;
             }
-            
-            if (isZip && selectedFile.size > 25 * 1024 * 1024) {
-                showError('ZIP file is larger than the 25 MB limit.');
+
+            if (selectedFile && selectedFile.size > MAX_UPLOAD_BYTES) {
+                showError('File is larger than the 3.5 MB Vercel limit.');
                 return;
             }
-            
+
+            if (!isZip && htmlCode.length > MAX_UPLOAD_BYTES) {
+                showError('HTML is larger than the 3.5 MB Vercel limit.');
+                return;
+            }
+
             buildPanel.classList.remove('hidden');
             buildLog.textContent = '';
             isBuilding = true;
             buildBtn.disabled = true;
             buildBtn.innerHTML = '<span class="spinner"></span> BUILDING...';
-            
+
             updateBuildStatus('Preparing project...', 5);
             addBuildLog('◆ Build started at ' + new Date().toLocaleTimeString());
             addBuildLog('◆ App: ' + appName);
             addBuildLog('◆ Type: ' + selectedType.toUpperCase());
-            
+
             const slug = appName.toLowerCase().replace(/[^a-z0-9_]+/g, '').replace(/^[^a-z]+/, '') || 'app';
             const packageName = 'com.fourseven.' + slug;
             addBuildLog('◆ Package: ' + packageName);
-            
+
             try {
                 const formData = new FormData();
-                
+
                 if (isZip) {
                     formData.append('project', selectedFile, selectedFile.name);
                     addBuildLog('◆ ZIP: ' + selectedFile.name);
@@ -422,19 +408,19 @@
                     formData.append('project', htmlFile, htmlFile.name);
                     addBuildLog('◆ HTML size: ' + htmlCode.length + ' bytes');
                 }
-                
+
                 formData.append('appName', appName);
                 formData.append('packageName', packageName);
                 formData.append('projectType', selectedType);
-                
+
                 updateBuildStatus('Uploading project...', 15);
                 addBuildLog('◆ Sending project to Builder API...');
-                
+
                 const response = await fetch(API_URL + '/build', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const text = await response.text();
                 let data = {};
                 try {
@@ -442,97 +428,86 @@
                 } catch (_) {
                     throw new Error(text || 'Server returned an invalid response.');
                 }
-                
+
                 if (!response.ok) {
                     throw new Error(data.error || 'Build request failed.');
                 }
-                
+
                 if (!data.jobId) {
                     throw new Error('Builder did not return a job ID.');
                 }
-                
+
                 jobId = data.jobId;
                 addBuildLog('◆ Build created successfully.');
                 addBuildLog('◆ Job ID: ' + jobId);
                 updateBuildStatus('Build queued...', 20);
                 startPolling();
-                
+
             } catch (error) {
                 console.error(error);
                 showError(error.message || 'Could not start the build.');
                 addBuildLog('◆ ERROR: ' + (error.message || 'Unknown error'));
                 updateBuildStatus('Build failed', 100);
-                isBuilding = false;
-                buildBtn.disabled = false;
-                buildBtn.innerHTML = '> BUILD APK';
+                resetBuildButton();
             }
         }
-        
-        // ============================================================
-        // POLLING FOR STATUS
-        // ============================================================
+
         function startPolling() {
             let attempts = 0;
             const maxAttempts = 100;
-            
+
             if (pollInterval) clearInterval(pollInterval);
-            
+
             pollInterval = setInterval(async function() {
                 attempts++;
                 try {
-                    const response = await fetch(API_URL + '/build/' + encodeURIComponent(jobId));
+                    const response = await fetch(API_URL + '/build/' + encodeURIComponent(jobId), { cache: 'no-store' });
                     const data = await response.json();
-                    
+
                     if (!response.ok) {
                         throw new Error(data.error || 'Failed to get status');
                     }
-                    
+
                     updateBuildStatus(data.statusText || 'Building...', data.progress || 40);
-                    
+
                     if (data.message) {
                         buildMessage.textContent = data.message;
                     }
-                    
+
                     if (data.log) {
                         buildLog.textContent = data.log;
                     }
-                    
+
                     if (data.status === 'completed') {
                         clearInterval(pollInterval);
                         pollInterval = null;
-                        isBuilding = false;
-                        buildBtn.disabled = false;
-                        buildBtn.innerHTML = '> BUILD APK';
-                        
+                        resetBuildButton();
+
                         updateBuildStatus('Build Complete', 100);
-                        buildMessage.textContent = 'APK ready for download!';
-                        showSuccess('Build Complete! Your APK is ready.');
-                        
+                        buildMessage.textContent = 'APK ready. Download the ZIP and open the APK inside.';
+                        showSuccess('Build Complete! Download the ZIP, then install the APK inside it.');
+
                         const url = data.downloadUrl || API_URL + '/download/' + encodeURIComponent(jobId);
                         downloadBtn.href = url;
                         downloadBtn.classList.remove('hidden');
                         addBuildLog('◆ APK ready for download');
-                        
+
                     } else if (data.status === 'failed') {
                         clearInterval(pollInterval);
                         pollInterval = null;
-                        isBuilding = false;
-                        buildBtn.disabled = false;
-                        buildBtn.innerHTML = '> BUILD APK';
+                        resetBuildButton();
                         showError(data.error || data.message || 'Build failed');
                         updateBuildStatus('Build failed', 100);
                     }
-                    
+
                     if (attempts >= maxAttempts) {
                         clearInterval(pollInterval);
                         pollInterval = null;
-                        isBuilding = false;
-                        buildBtn.disabled = false;
-                        buildBtn.innerHTML = '> BUILD APK';
-                        showError('Build timed out after 5 minutes. Please try again.');
+                        resetBuildButton();
+                        showError('Build timed out after 5 minutes. Check the Actions tab on GitHub.');
                         addBuildLog('◆ Build timed out');
                     }
-                    
+
                 } catch (error) {
                     if (attempts > 5) {
                         addBuildLog('◆ Status check error: ' + error.message);
@@ -540,37 +515,31 @@
                 }
             }, 3000);
         }
-        
-        // ============================================================
-        // UI HELPERS
-        // ============================================================
+
         function updateBuildStatus(title, percent) {
             const pct = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
             buildTitle.textContent = title;
             buildPercent.textContent = pct + '%';
             progressBar.style.width = pct + '%';
         }
-        
+
         function addBuildLog(message) {
             buildLog.textContent += '[' + new Date().toLocaleTimeString() + '] ' + message + '\n';
             buildLog.scrollTop = buildLog.scrollHeight;
         }
-        
+
         function showError(message) {
             errorBox.textContent = 'ERROR: ' + message;
             errorBox.classList.remove('hidden');
             successBox.classList.add('hidden');
         }
-        
+
         function showSuccess(message) {
             successBox.textContent = 'SUCCESS: ' + message;
             successBox.classList.remove('hidden');
             errorBox.classList.add('hidden');
         }
-        
-        // ============================================================
-        // API STATUS CHECK
-        // ============================================================
+
         async function checkApiStatus() {
             try {
                 const response = await fetch(API_URL + '/health', { cache: 'no-store' });
@@ -584,10 +553,7 @@
                 apiStatus.className = 'api-status offline';
             }
         }
-        
-        // ============================================================
-        // KEYBOARD SHORTCUTS
-        // ============================================================
+
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.key === 'Enter') {
                 e.preventDefault();
@@ -598,10 +564,7 @@
                 saveProject();
             }
         });
-        
-        // ============================================================
-        // TAB SUPPORT IN TEXTAREA
-        // ============================================================
+
         codeEditor.addEventListener('keydown', function(e) {
             if (e.key === 'Tab') {
                 e.preventDefault();
@@ -611,15 +574,11 @@
                 this.selectionStart = this.selectionEnd = start + 2;
             }
         });
-        
-        // ============================================================
-        // INIT
-        // ============================================================
+
         setTimeout(updatePreview, 300);
         setTimeout(checkApiStatus, 500);
         setInterval(checkApiStatus, 60000);
-        
-        // Auto-save every 30 seconds
+
         setInterval(function() {
             const name = projectNameInput.value.trim() || 'MyProject';
             if (codeEditor.value) {

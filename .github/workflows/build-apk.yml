@@ -149,4 +149,4 @@ jobs:
         with:
           name: ${{ github.event.client_payload.jobId }}
           path: output/*.apk
-          retention-days: 7
+          retention-days: 

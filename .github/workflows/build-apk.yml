@@ -3,21 +3,10 @@ name: Build APK
 on:
   repository_dispatch:
     types: [build-apk]
-  workflow_dispatch:
-    inputs:
-      appName:
-        description: App name
-        default: StarTap
-        required: true
-
-permissions:
-  contents: read
-  actions: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -35,36 +24,129 @@ jobs:
       - name: Install Cordova
         run: npm install -g cordova
 
-      - name: Create Cordova project
-        run: cordova create app com.fourseven.startap "StarTap"
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
 
-      - name: Copy HTML
+      - name: Decode project
+        env:
+          PROJECT_BASE64: ${{ github.event.client_payload.projectBase64 }}
+          PROJECT_NAME: ${{ github.event.client_payload.projectFileName }}
+        run: echo "$PROJECT_BASE64" | base64 -d > "$PROJECT_NAME"
+
+      - name: Create Cordova project
+        env:
+          APP_NAME: ${{ github.event.client_payload.appName }}
+          PACKAGE_NAME: ${{ github.event.client_payload.packageName }}
+        run: cordova create app $PACKAGE_NAME "$APP_NAME"
+
+      - name: Add project files
+        env:
+          PROJECT_NAME: ${{ github.event.client_payload.projectFileName }}
         run: |
           cd app/www
-          rm -rf css js img
-          rm -f index.html
-          if [ -f "../../manual/index.html" ]; then
-            cp "../../manual/index.html" index.html
+          rm -f css/index.css js/index.js index.html
+          if [ "${PROJECT_NAME##*.}" = "zip" ]; then
+            unzip -o "../../$PROJECT_NAME" -d .
           else
-            echo "<h1>Missing manual/index.html</h1>" > index.html
+            cp "../../$PROJECT_NAME" index.html
           fi
-          test -f index.html
 
-      - name: Build debug APK
+      - name: Generate FS Taps app icon
+        run: |
+          mkdir -p app/res/icon/android
+          mkdir -p app/res/icon/ios
+          mkdir -p app/res/screen/android
+
+          cat > /tmp/icon.svg << 'SVGEOF'
+          <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+            <defs>
+              <linearGradient id="silver" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#ffffff"/>
+                <stop offset="50%" stop-color="#b8b8b8"/>
+                <stop offset="100%" stop-color="#6b6b6b"/>
+              </linearGradient>
+              <radialGradient id="glow" cx="50%" cy="40%" r="60%">
+                <stop offset="0%" stop-color="#1e2228"/>
+                <stop offset="100%" stop-color="#000000"/>
+              </radialGradient>
+            </defs>
+            <rect width="1024" height="1024" fill="url(#glow)"/>
+            <polygon points="512,80 962,512 512,944 62,512" fill="none" stroke="#8a949e" stroke-width="6" opacity="0.4"/>
+            <polygon points="512,140 900,512 512,884 124,512" fill="none" stroke="#8a949e" stroke-width="4" opacity="0.25"/>
+            <text x="512" y="440" font-family="Arial Black, sans-serif" font-size="200" font-weight="900" fill="url(#silver)" text-anchor="middle" letter-spacing="8">FS</text>
+            <text x="512" y="640" font-family="Arial Black, sans-serif" font-size="140" font-weight="900" fill="url(#silver)" text-anchor="middle" letter-spacing="4">TAPS</text>
+            <path d="M512 740 L530 770 L512 800 L494 770 Z" fill="#ffffff" opacity="0.85"/>
+          </svg>
+          SVGEOF
+
+          convert -background none /tmp/icon.svg -resize 48x48 app/res/icon/android/ldpi.png
+          convert -background none /tmp/icon.svg -resize 72x72 app/res/icon/android/mdpi.png
+          convert -background none /tmp/icon.svg -resize 96x96 app/res/icon/android/hdpi.png
+          convert -background none /tmp/icon.svg -resize 144x144 app/res/icon/android/xhdpi.png
+          convert -background none /tmp/icon.svg -resize 192x192 app/res/icon/android/xxhdpi.png
+          convert -background none /tmp/icon.svg -resize 512x512 app/res/icon/android/xxxhdpi.png
+          convert -background none /tmp/icon.svg -resize 1024x1024 app/res/icon/ios/icon-1024.png
+          convert -background "#0a0a0a" /tmp/icon.svg -resize 512x512 app/res/screen/android/splash-port-hdpi.png
+          convert -background "#0a0a0a" /tmp/icon.svg -resize 720x720 app/res/screen/android/splash-port-xhdpi.png
+
+          ls -la app/res/icon/android/
+
+      - name: Add Android platform
         run: |
           cd app
           cordova platform add android
-          cordova build android
 
-      - name: Collect APK
+      - name: Configure app name
         run: |
+          cd app
+          sed -i 's|<name>.*</name>|<name>FS Taps</name>|' config.xml
+          sed -i 's|<description>.*</description>|<description>FS Taps - Tap Game by Four Seven</description>|' config.xml
+          sed -i 's|<author email=".*" href=".*">.*</author>|<author email="fourseven@example.com" href="#">Four Seven</author>|' config.xml
+
+      - name: Generate signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore fourseven.keystore \
+            -alias fourseven \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass fourseven123 \
+            -keypass fourseven123 \
+            -dname "CN=FS Taps, OU=Builder, O=FourSeven, L=City, S=State, C=US"
+
+      - name: Configure Cordova signing
+        run: |
+          cd app
+          cat > build.json << 'EOF'
+          {
+            "android": {
+              "release": {
+                "keystore": "../fourseven.keystore",
+                "storePassword": "fourseven123",
+                "alias": "fourseven",
+                "password": "fourseven123",
+                "keystoreType": ""
+              }
+            }
+          }
+          EOF
+
+      - name: Build signed release APK
+        run: |
+          cd app
+          cordova build android --release
+
+      - name: Rename APK
+        env:
+          APP_NAME: ${{ github.event.client_payload.appName }}
+        run: |
+          APK=$(find app -name "*-release.apk" -o -name "*.apk" | head -1)
+          echo "Found: $APK"
           mkdir -p output
-          APK=$(find app/platforms/android -name "*.apk" | head -1)
-          test -n "$APK"
-          cp "$APK" output/StarTap.apk
+          cp "$APK" "output/${APP_NAME}.apk"
+          ls -la output/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: StarTap
+          name: ${{ github.event.client_payload.jobId }}
           path: output/*.apk
           retention-days: 7

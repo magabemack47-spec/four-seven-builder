@@ -1,127 +1,277 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Star Tap</title>
-  <style>
-    * { box-sizing: border-box; user-select: none; }
-    body {
-      margin: 0;
-      height: 100vh;
-      background: #05080d;
-      color: #d7ffe4;
-      font-family: Arial, sans-serif;
-      overflow: hidden;
-    }
-    #ui {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      padding: 14px 16px;
-      display: flex;
-      justify-content: space-between;
-      font-weight: bold;
-      z-index: 2;
-    }
-    #board { position: fixed; inset: 0; }
-    #start {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,.72);
-      z-index: 3;
-      text-align: center;
-      padding: 20px;
-    }
-    h1 { color: #00ff41; margin: 0 0 10px; }
-    p { color: #9bb7a8; }
-    button {
-      margin-top: 18px;
-      border: 0;
-      border-radius: 10px;
-      background: #00ff41;
-      color: #000;
-      font-size: 20px;
-      font-weight: bold;
-      padding: 12px 28px;
-    }
-    .star {
-      position: absolute;
-      border-radius: 50%;
-      background: #00ff41;
-      box-shadow: 0 0 18px #00ff41;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#071226">
+<title>FS Chat In</title>
+<style>
+:root{--bg:#07111c;--card:#0d1b2e;--line:#1c334f;--a:#3b82f6;--t:#eaf3ff;--m:#8aa3c4}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#07111c;color:var(--t);font-family:Arial,sans-serif}
+header{position:sticky;top:0;z-index:8;display:flex;justify-content:space-between;align-items:center;padding:12px;background:#07111cf2;border-bottom:1px solid var(--line)}
+.brand{display:flex;gap:8px;align-items:center;font-weight:900}
+.mark{width:36px;height:36px;border-radius:12px;background:linear-gradient(160deg,#2563eb,#22d3ee);display:grid;place-items:center;font-size:12px}
+main{padding:10px 10px 88px}
+.hidden{display:none!important}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin:0 0 10px}
+.row{display:flex;gap:10px;align-items:center}
+.avatar{width:42px;height:42px;border-radius:50%;background:#163154;display:grid;place-items:center;overflow:hidden;flex:0 0 auto}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.grow{flex:1;min-width:0}
+.muted{color:var(--m);font-size:13px}
+button{border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:800;padding:9px 11px}
+.ghost{background:transparent;color:#93c5fd;border:1px solid #24466d}
+input,textarea,select{width:100%;margin-top:8px;border:1px solid var(--line);background:#0b1728;color:#fff;border-radius:12px;padding:10px}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);background:#0a1624;border-top:1px solid var(--line)}
+nav button{background:transparent;color:var(--m);font-size:11px;padding:11px 0}
+nav button.on{color:#7dd3fc}
+.item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.msgs{min-height:38vh;display:flex;flex-direction:column;gap:7px}
+.bubble{max-width:80%;padding:8px 10px;border-radius:14px}
+.me{align-self:flex-end;background:#1d4ed8}
+.them{align-self:flex-start;background:#163251}
+.auth,.lock{position:fixed;inset:0;background:#07111c;display:flex;align-items:center;justify-content:center;z-index:40;padding:18px;text-align:center}
+.lock{display:none} .lock.show{display:flex}
+.pad{display:grid;grid-template-columns:repeat(3,70px);gap:8px;justify-content:center}
+</style>
 </head>
 <body>
-  <div id="ui">
-    <span>Score: <span id="score">0</span></span>
-    <span>Time: <span id="time">20</span></span>
+<div id="auth" class="auth">
+  <div>
+    <div class="mark" style="margin:0 auto 10px;width:64px;height:64px;font-size:20px">47</div>
+    <h2>FS Chat In</h2>
+    <p class="muted">Created by FOUR x SEVEN</p>
+    <input id="user" placeholder="Username">
+    <input id="pass" type="password" placeholder="Password">
+    <div style="height:8px"></div>
+    <button onclick="signIn()">Sign in</button>
+    <button class="ghost" onclick="signUp()">Sign up</button>
   </div>
-  <div id="board"></div>
-  <div id="start">
-    <h1>STAR TAP</h1>
-    <p>Tap the green stars before they vanish.</p>
-    <button onclick="startGame()">PLAY</button>
+</div>
+<div id="lock" class="lock">
+  <div>
+    <div class="mark" style="margin:0 auto 10px">47</div>
+    <p>Enter PIN</p>
+    <p id="pinDots">----</p>
+    <div class="pad" id="pad"></div>
   </div>
-  <script>
-    const board = document.getElementById('board');
-    const startBox = document.getElementById('start');
-    const scoreEl = document.getElementById('score');
-    const timeEl = document.getElementById('time');
-    let score = 0;
-    let time = 20;
-    let timer = null;
-    let spawn = null;
-
-    function startGame() {
-      score = 0;
-      time = 20;
-      scoreEl.textContent = score;
-      timeEl.textContent = time;
-      board.innerHTML = '';
-      startBox.style.display = 'none';
-      spawnStar();
-      spawn = setInterval(spawnStar, 700);
-      timer = setInterval(function() {
-        time -= 1;
-        timeEl.textContent = time;
-        if (time <= 0) endGame();
-      }, 1000);
-    }
-
-    function spawnStar() {
-      const star = document.createElement('div');
-      star.className = 'star';
-      const size = 36 + Math.floor(Math.random() * 28);
-      star.style.width = size + 'px';
-      star.style.height = size + 'px';
-      star.style.left = Math.random() * (window.innerWidth - size) + 'px';
-      star.style.top = (60 + Math.random() * (window.innerHeight - size - 80)) + 'px';
-      star.onclick = function() {
-        score += 1;
-        scoreEl.textContent = score;
-        star.remove();
-      };
-      board.appendChild(star);
-      setTimeout(function() {
-        if (star.parentNode) star.remove();
-      }, 1200);
-    }
-
-    function endGame() {
-      clearInterval(timer);
-      clearInterval(spawn);
-      board.innerHTML = '';
-      startBox.style.display = 'flex';
-      startBox.querySelector('p').textContent = 'Game over. Score: ' + score;
-      startBox.querySelector('button').textContent = 'PLAY AGAIN';
-    }
-  </script>
+</div>
+<div id="app" class="hidden">
+<header>
+  <div class="brand"><div class="mark">47</div><span id="topTitle">FS Chat In</span></div>
+  <button class="ghost" onclick="lockNow()">Lock</button>
+</header>
+<main id="main"></main>
+<nav>
+  <button class="on" data-tab="chats" onclick="tab('chats',this)">Chats</button>
+  <button data-tab="status" onclick="tab('status',this)">Status</button>
+  <button data-tab="calls" onclick="tab('calls',this)">Calls</button>
+  <button data-tab="hub" onclick="tab('hub',this)">Hub</button>
+  <button data-tab="menu" onclick="tab('menu',this)">Menu</button>
+</nav>
+</div>
+<script>
+const VERSION='1.3.0';
+const $ = id => document.getElementById(id);
+const hash = s => { let h=0; for (const c of s) h = ((h<<5)-h)+c.charCodeAt(0)|0; return String(h); };
+const load = () => { try { return JSON.parse(localStorage.getItem('fsci')||'{}'); } catch(e){ return {}; } };
+const save = () => localStorage.setItem('fsci', JSON.stringify(all));
+let all = Object.assign({users:{},session:null}, load());
+let session=null, data=null, view='chats', current=null, once=false, rec=null, pinBuf='';
+function blank(name){
+  return {
+    me:{name, about:'Using FS Chat In', pic:'', phone:'', theme:'dark', font:16, accent:'#3b82f6'},
+    pin:'', privacy:{lastSeen:'friends', photo:'friends', about:'friends', receipts:true, groups:'everyone'},
+    people:[{id:'p1',name:'Alex',group:false},{id:'p2',name:'Sam',group:false},{id:'g1',name:'Home Group',group:true}],
+    chats:{p1:[{from:'them',type:'text',text:'Welcome to FS Chat In'}],p2:[{from:'them',type:'text',text:'Send a photo or voice note'}],g1:[{from:'them',type:'text',text:'Group ready'}]},
+    archived:{}, starred:[], statuses:[], posts:[], calls:[], channels:[{id:'c1',name:'FS News',desc:'App updates'}],
+    communities:[{id:'cm1',name:'FOUR x SEVEN',desc:'Official community'}],
+    settings:{enterSend:true, mediaVis:false, keepArchived:true, notify:true, vibrate:true, dataSaver:false},
+    blocked:[]
+  };
+}
+function persist(){ if(session){ all.users[session].data=data; all.session=session; save(); } }
+function signUp(){
+  const u=$('user').value.trim().toLowerCase(), p=$('pass').value;
+  if(u.length<3||p.length<4) return alert('Username 3+ and password 4+');
+  if(all.users[u]) return alert('Username taken');
+  all.users[u]={pass:hash(p),data:blank(u)}; session=u; data=all.users[u].data; persist(); openApp();
+}
+function signIn(){
+  const u=$('user').value.trim().toLowerCase(), acc=all.users[u];
+  if(!acc||acc.pass!==hash($('pass').value)) return alert('Wrong sign in');
+  session=u; data=acc.data; persist(); openApp();
+}
+function openApp(){ $('auth').style.display='none'; $('app').classList.remove('hidden'); if(data.pin) lockNow(); tab('chats'); }
+function signOut(){ all.session=null; save(); location.reload(); }
+function ini(n){ return (n||'?')[0].toUpperCase(); }
+function person(id){ return data.people.find(p=>p.id===id)||{name:'Chat'}; }
+function tab(name,btn){
+  view=name; current=null;
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name));
+  if(name==='chats') renderChats();
+  else if(name==='status') renderStatus();
+  else if(name==='calls') renderCalls();
+  else if(name==='hub') renderHub();
+  else renderMenu();
+}
+function setMain(html,title){ $('main').innerHTML=html; $('topTitle').textContent=title||'FS Chat In'; }
+function renderChats(){
+  const q = (document.getElementById('q')||{value:''}).value || '';
+  const list=data.people.filter(p=>!data.archived[p.id] && !data.blocked.includes(p.id) && p.name.toLowerCase().includes(q.toLowerCase()));
+  setMain(`<input id="q" placeholder="Search chats, files, links" oninput="renderChats()" value="${q}">
+    <div class="card"><button onclick="addPerson(false)">New chat</button> <button class="ghost" onclick="addPerson(true)">New group</button></div>
+    ${list.map(p=>{const last=(data.chats[p.id]||[]).slice(-1)[0]; return `<div class="card row" onclick="openChat('${p.id}')"><div class="avatar">${ini(p.name)}</div><div class="grow"><b>${p.name}</b> ${p.group?'· group':''}<div class="muted">${last?last.text||last.type:'No messages'}</div></div></div>`;}).join('')}`, 'Chats');
+}
+function openChat(id){
+  current=id; const p=person(id);
+  const msgs=(data.chats[id]||[]).map((m,i)=>`<div class="bubble ${m.from==='me'?'me':'them'}">${m.text||''}${m.src&&m.type==='image'?`<br><img src="${m.src}" style="max-width:160px;border-radius:8px" onclick="openOnce('${id}',${i})">`:''}${m.type==='audio'?`<br><audio controls src="${m.src}"></audio>`:''}${m.once?'<div class="muted">View once</div>':''}
+    <div class="muted"><span onclick="star(${i})">Star</span> · <span onclick="reply(${i})">Reply</span></div></div>`).join('');
+  setMain(`<div class="card row"><button class="ghost" onclick="tab('chats')">Back</button><div class="grow"><b>${p.name}</b></div>
+    <button class="ghost" onclick="data.archived['${id}']=true;persist();tab('chats')">Archive</button></div>
+    <div class="msgs">${msgs}</div>
+    <div class="card"><input id="msg" placeholder="Message"><div style="height:8px"></div>
+    <button onclick="send()">Send</button>
+    <button class="ghost" onclick="fileEl.click()">File</button>
+    <button class="ghost" onclick="once=!once;alert(once?'View once on':'View once off')">Once</button>
+    <button class="ghost" onclick="mic()">Mic</button>
+    <input id="fileEl" type="file" accept="image/*,video/*,.pdf,.txt" class="hidden" onchange="sendFile(this)"></div>`,'Chat');
+}
+function send(){
+  const t=$('msg').value.trim(); if(!t||!current) return;
+  data.chats[current]=data.chats[current]||[]; data.chats[current].push({from:'me',type:'text',text:t,once,time:Date.now()});
+  once=false; persist(); openChat(current);
+}
+function sendFile(el){
+  const f=el.files[0]; if(!f||!current) return;
+  const r=new FileReader();
+  r.onload=()=>{ data.chats[current].push({from:'me',type:f.type.startsWith('image/')?'image':'file',text:f.name,src:r.result,once,time:Date.now()}); once=false; persist(); openChat(current); };
+  r.readAsDataURL(f);
+}
+function openOnce(cid,i){ const m=data.chats[cid][i]; if(m&&m.once){ data.chats[cid].splice(i,1); persist(); openChat(cid);} }
+function star(i){ data.starred.push({chat:current,i}); persist(); alert('Starred'); }
+function reply(i){ const m=data.chats[current][i]; $('msg').value='> '+(m.text||'')+'\\n'; }
+async function mic(){
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({audio:true});
+    const rec=new MediaRecorder(s); const chunks=[];
+    rec.ondataavailable=e=>chunks.push(e.data);
+    rec.onstop=()=>{ s.getTracks().forEach(t=>t.stop()); const b=new Blob(chunks,{type:'audio/webm'}); const r=new FileReader(); r.onload=()=>{ data.chats[current].push({from:'me',type:'audio',text:'Voice note',src:r.result,time:Date.now()}); persist(); openChat(current); }; r.readAsDataURL(b); };
+    rec.start(); setTimeout(()=>rec.stop(),4000); alert('Recording 4 seconds...');
+  }catch(e){ alert('Mic blocked'); }
+}
+function addPerson(group){
+  const name=prompt(group?'Group name':'Friend name'); if(!name) return;
+  const id=(group?'g':'p')+Date.now();
+  data.people.push({id,name,group}); data.chats[id]=[{from:'them',type:'text',text:group?'Group created':'Say hi'}]; persist(); renderChats();
+}
+function renderStatus(){
+  data.statuses=(data.statuses||[]).filter(s=>Date.now()-s.time<86400000);
+  setMain(`<div class="card"><textarea id="st" placeholder="Status for 24 hours"></textarea>
+    <input id="stf" type="file" accept="image/*"><button onclick="addStatus()">Share status</button></div>
+    ${data.statuses.map(s=>`<div class="card"><b>${s.by}</b> <span class="muted">${Math.max(0,24-Math.floor((Date.now()-s.time)/3600000))}h left</span><p>${s.text||''}</p>${s.src?`<img src="${s.src}" style="max-width:100%;border-radius:10px">`:''}</div>`).join()||'<div class="card muted">No status</div>'}
+    <div class="card"><b>Status privacy</b><p class="muted">Friends on this device can see status.</p></div>`,'Status');
+  if(data.statuses.length){ /* keep */ }
+}
+function addStatus(){
+  const text=$('st').value.trim(); const f=$('stf').files[0];
+  const done=src=>{ data.statuses.unshift({by:data.me.name,text,src,time:Date.now()}); persist(); renderStatus(); };
+  if(f){ const r=new FileReader(); r.onload=()=>done(r.result); r.readAsDataURL(f);} else if(text) done('');
+}
+function renderCalls(){
+  setMain(`<div class="card"><p>Calls on this phone are local demo calls. A worldwide call network needs a server.</p>
+    ${data.people.map(p=>`<div class="item"><span>${p.name}</span><span><button onclick="fakeCall('${p.name}','voice')">Voice</button> <button class="ghost" onclick="fakeCall('${p.name}','video')">Video</button></span></div>`).join('')}
+    </div><div class="card"><b>Call history</b>${data.calls.map(c=>`<div class="muted">${c.type} · ${c.name} · ${new Date(c.time).toLocaleString()}</div>`).join()||'<p class="muted">No calls yet</p>'}</div>`,'Calls');
+}
+function fakeCall(name,type){ data.calls.unshift({name,type,time:Date.now()}); persist(); alert(type+' call screen with '+name+' (demo on this device)'); renderCalls(); }
+function renderHub(){
+  setMain(`<div class="card"><b>Communities</b>${data.communities.map(c=>`<div class="item"><div><b>${c.name}</b><div class="muted">${c.desc}</div></div></div>`).join('')}
+    <button onclick="data.communities.push({id:'cm'+Date.now(),name:prompt('Community name')||'Community',desc:'New'});persist();renderHub()">Create community</button></div>
+    <div class="card"><b>Channels</b>${data.channels.map(c=>`<div class="item"><div><b>${c.name}</b><div class="muted">${c.desc}</div></div><button class="ghost">Follow</button></div>`).join('')}
+    <button onclick="data.channels.push({id:'c'+Date.now(),name:prompt('Channel name')||'Channel',desc:'Updates'});persist();renderHub()">Create channel</button></div>
+    <div class="card"><b>FS AI</b><p class="muted">Local helper for this app.</p><input id="aiq" placeholder="Ask FS AI"><button onclick="ai()">Ask</button><p id="aia" class="muted"></p></div>`,'Hub');
+}
+function ai(){
+  const q=($('aiq').value||'').toLowerCase();
+  $('aia').textContent = q.includes('backup') ? 'Settings → Backup to export your chats.' : q.includes('pin') ? 'Menu → Security Center to set a PIN.' : 'FS Chat In can chat, post status, make demo calls, and back up on this phone. Created by FOUR x SEVEN.';
+}
+function renderMenu(){
+  const rows=[
+    ['Account','account'],['Privacy','privacy'],['Chats settings','cset'],['Notifications','notes'],
+    ['Storage & data','storage'],['Appearance','appear'],['Accessibility','access'],
+    ['Security Center','sec'],['Backup & transfer','backup'],['FS Cloud','cloud'],
+    ['Linked devices','devices'],['Help & support','help']
+  ].map(([n,k])=>`<div class="item" onclick="page('${k}')"><b>${n}</b><span class="muted">></span></div>`).join('');
+  setMain(`<div class="card row"><div class="avatar">${ini(data.me.name)}</div><div class="grow"><b>${data.me.name}</b><div class="muted">@${session}</div></div></div>
+    <div class="card">${rows}</div>
+    <div class="card"><b>This app was created by FOUR x SEVEN.</b><p class="muted">FS Chat In ${VERSION}</p><button class="ghost" onclick="signOut()">Sign out</button></div>`,'Menu');
+}
+function page(k){
+  const p={
+    account:`<div class="card"><input id="dn" value="${data.me.name}" placeholder="Name"><input id="ab" value="${data.me.about}" placeholder="About"><input id="ph" value="${data.me.phone||''}" placeholder="Phone number (on this device)">
+      <button onclick="data.me.name=$('dn').value;data.me.about=$('ab').value;data.me.phone=$('ph').value;persist();alert('Saved')">Save profile</button>
+      <p class="muted">Change number, passkeys and delete account stay on this phone in v${VERSION}.</p>
+      <button class="ghost" onclick="if(confirm('Delete this account on this phone?')){delete all.users[session];all.session=null;save();location.reload()}">Delete account</button></div>`,
+    privacy:`<div class="card">
+      ${['lastSeen','photo','about'].map(x=>`<div class="item"><span>${x}</span><select onchange="data.privacy.${x}=this.value;persist()"><option ${data.privacy[x]==='everyone'?'selected':''}>everyone</option><option ${data.privacy[x]==='friends'?'selected':''}>friends</option><option ${data.privacy[x]==='nobody'?'selected':''}>nobody</option></select></div>`).join('')}
+      <div class="item"><span>Read receipts</span><button class="ghost" onclick="data.privacy.receipts=!data.privacy.receipts;persist();page('privacy')">${data.privacy.receipts?'On':'Off'}</button></div>
+      <p class="muted">Live location and real caller-ID blocking need a live network. Block list works on this device.</p>
+      <button onclick="const n=prompt('Name to block'); if(n){const p=data.people.find(x=>x.name.toLowerCase()===n.toLowerCase()); if(p){data.blocked.push(p.id);persist();alert('Blocked');}}">Block account</button>
+    </div>`,
+    cset:`<div class="card">
+      <div class="item"><span>Enter is send</span><button class="ghost" onclick="data.settings.enterSend=!data.settings.enterSend;persist();page('cset')">${data.settings.enterSend?'On':'Off'}</button></div>
+      <div class="item"><span>Keep archived</span><button class="ghost" onclick="data.settings.keepArchived=!data.settings.keepArchived;persist();page('cset')">${data.settings.keepArchived?'On':'Off'}</button></div>
+      <p class="muted">Starred messages: ${data.starred.length}. Font size and disappearing timers are stored locally.</p>
+    </div>`,
+    notes:`<div class="card">
+      <div class="item"><span>Message alerts</span><button class="ghost" onclick="data.settings.notify=!data.settings.notify;persist();page('notes')">${data.settings.notify?'On':'Off'}</button></div>
+      <div class="item"><span>Vibration</span><button class="ghost" onclick="data.settings.vibrate=!data.settings.vibrate;persist();page('notes')">${data.settings.vibrate?'On':'Off'}</button></div>
+    </div>`,
+    storage:`<div class="card"><p>Local data size: ${Math.round(JSON.stringify(data).length/1024)} KB</p>
+      <button onclick="localStorage.removeItem('fsci_cache');alert('Cache cleared')">Clear cache</button></div>`,
+    appear:`<div class="card"><p>Dark theme is on. Accent blue 47.</p><p class="muted">Light mode can be added in a later update by rebuilding the APK.</p></div>`,
+    access:`<div class="card"><label>Font size <input type="range" min="14" max="22" value="${data.me.font}" oninput="document.body.style.fontSize=this.value+'px';data.me.font=+this.value;persist()"></label>
+      <p class="muted">High contrast and reduced motion can follow the phone settings.</p></div>`,
+    sec:`<div class="card"><b>FS Security Center</b>
+      <p>Security score: ${data.pin?'Good':'Set a PIN'}</p>
+      <input id="np" maxlength="4" placeholder="4-digit PIN">
+      <button onclick="const v=$('np').value.replace(/\\D/g,'').slice(0,4); if(v.length===4){data.pin=hash(v);persist();alert('PIN saved')}">Save PIN</button>
+      <button class="ghost" onclick="data.pin='';persist();alert('PIN removed')">Remove PIN</button>
+      <p class="muted">Two-step PIN protects the app on this device. Passkeys need the phone account manager.</p></div>`,
+    backup:`<div class="card">
+      <button onclick="exp()">Export chat backup</button>
+      <button class="ghost" onclick="$('im').click()">Restore backup</button>
+      <input id="im" type="file" accept="application/json" class="hidden" onchange="imp(this)">
+      <p class="muted">Encrypted cloud backup needs FS Cloud servers. File backup works now.</p></div>`,
+    cloud:`<div class="card"><b>FS Cloud</b><p class="muted">Cloud sync needs a FOUR x SEVEN server. Use Export backup for now. Check for updates rebuilds the APK from GitHub.</p>
+      <button onclick="alert('Installed '+VERSION+'. To update, replace manual/index.html and Run workflow.')">Check for updates</button></div>`,
+    devices:`<div class="card"><b>This device</b><p class="muted">Phone · signed in as @${session}</p><p class="muted">Desktop, tablet and web need the same account server.</p></div>`,
+    help:`<div class="card"><b>Help & support</b>
+      <p>Created by FOUR x SEVEN.</p>
+      <p class="muted">This app is original. It is not WhatsApp or Facebook.</p>
+      <p class="muted">Privacy: data stays on this phone unless you export a backup.</p>
+      <p class="muted">To update: GitHub Actions → Build APK.</p></div>`
+  };
+  setMain(`<button class="ghost" onclick="renderMenu()">Back</button>${p[k]||''}`, k);
+}
+function exp(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify({version:VERSION,user:session,data},null,2)],{type:'application/json'}));
+  a.download='fs-chat-in-backup.json'; a.click();
+}
+function imp(el){
+  const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); data=Object.assign(blank(data.me.name), j.data||j); persist(); alert('Restored'); tab('chats'); }catch(e){ alert('Bad file'); } };
+  r.readAsText(el.files[0]);
+}
+function lockNow(){ if(!data||!data.pin) return; pinBuf=''; $('lock').classList.add('show'); $('pinDots').textContent='----'; }
+function press(n){
+  if(n==='C'){ pinBuf=''; } else pinBuf+=n;
+  $('pinDots').textContent = (pinBuf+'----').slice(0,4).replace(/./g,'•') + '----'.slice(pinBuf.length);
+  if(n!=='C' && pinBuf.length===4){ if(hash(pinBuf)===data.pin) $('lock').classList.remove('show'); else { pinBuf=''; alert('Wrong PIN'); } }
+}
+$('pad').innerHTML=['1','2','3','4','5','6','7','8','9','C','0'].map(n=>`<button onclick="press('${n}')">${n}</button>`).join('');
+if(all.session && all.users[all.session]){ session=all.session; data=all.users[session].data; openApp(); }
+</script>
 </body>
 </html>

@@ -261,17 +261,36 @@ function exp(){
   a.download='fs-chat-in-backup.json'; a.click();
 }
 function imp(el){
-  const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); data=Object.assign(blank(data.me.name), j.data||j); persist(); alert('Restored'); tab('chats'); }catch(e){ alert('Bad file'); } };
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const j=JSON.parse(r.result);
+      if(j.data){ data=j.data; persist(); alert('Backup restored!'); location.reload(); }
+    }catch(e){ alert('Invalid backup file'); }
+  };
   r.readAsText(el.files[0]);
 }
-function lockNow(){ if(!data||!data.pin) return; pinBuf=''; $('lock').classList.add('show'); $('pinDots').textContent='----'; }
-function press(n){
-  if(n==='C'){ pinBuf=''; } else pinBuf+=n;
-  $('pinDots').textContent = (pinBuf+'----').slice(0,4).replace(/./g,'•') + '----'.slice(pinBuf.length);
-  if(n!=='C' && pinBuf.length===4){ if(hash(pinBuf)===data.pin) $('lock').classList.remove('show'); else { pinBuf=''; alert('Wrong PIN'); } }
+function lockNow(){
+  if(!data || !data.pin) return;
+  pinBuf=''; $('pinDots').textContent='----';
+  $('lock').classList.add('show');
+  const pad=$('pad'); pad.innerHTML='';
+  [1,2,3,4,5,6,7,8,9,'C',0,'OK'].forEach(k=>{
+    const b=document.createElement('button');
+    b.textContent=k;
+    b.onclick=()=>pinPress(k);
+    pad.appendChild(b);
+  });
 }
-$('pad').innerHTML=['1','2','3','4','5','6','7','8','9','C','0'].map(n=>`<button onclick="press('${n}')">${n}</button>`).join('');
-if(all.session && all.users[all.session]){ session=all.session; data=all.users[session].data; openApp(); }
+function pinPress(k){
+  if(k==='C'){ pinBuf=''; }
+  else if(k==='OK'){
+    if(hash(pinBuf)===data.pin){ $('lock').classList.remove('show'); }
+    else { alert('Wrong PIN'); pinBuf=''; }
+  }
+  else if(pinBuf.length<4){ pinBuf+=k; }
+  $('pinDots').textContent=pinBuf.padEnd(4,'-');
+}
 </script>
 </body>
 </html>

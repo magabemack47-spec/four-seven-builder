@@ -7,7 +7,7 @@ on:
     inputs:
       appName:
         description: App name
-        default: StarTap
+        default: FS Chat In
         required: true
 
 permissions:
@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: '20'
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -38,7 +38,7 @@ jobs:
         run: npm install -g cordova
 
       - name: Create Cordova project
-        run: cordova create app com.fourseven.startap "StarTap"
+        run: cordova create app com.fourseven.fschatin "FS Chat In"
 
       - name: Copy HTML
         run: |
@@ -63,10 +63,10 @@ jobs:
           mkdir -p output
           APK=$(find app/platforms/android -name "*.apk" | head -1)
           test -n "$APK"
-          cp "$APK" output/StarTap.apk
+          cp "$APK" output/FSChatIn.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: StarTap
+          name: FS-Chat-In-App
           path: output/*.apk
           retention-days: 7
